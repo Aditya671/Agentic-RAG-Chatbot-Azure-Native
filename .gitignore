@@ -1,0 +1,11 @@
+venv
+.venv
+.DS_Store
+*.txt
+*.json
+*.png
+.env
+.env.*
+__pychache__
+storage/
+data

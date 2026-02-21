@@ -1,0 +1,38 @@
+[project]
+name = "agentic-rag-chatbot-azure-native"
+version = "1.0.0"
+description = "A global enterprise Agentic RAG system featuring multi-agent orchestration and Azure-native persistence."
+authors = [
+    { name = "Aditya Gupta", email = "aditya.gupta671@gmail.com" }
+]
+readme = "README.md"
+requires-python = ">=3.12"
+license = {file = "LICENSE"}
+dependencies = [
+    "chainlit>=1.1.0",           # Main UI Framework 
+    "pandasai>=2.0.0"            # Added for modern conversational data analysis
+    "llama-index-core",          # RAG Orchestration 
+    "llama-index-llms-azure-openai", # Azure LLM Integration 
+    "llama-index-embeddings-azure-openai", # Azure Embeddings 
+    "llama-index-vector-stores-azureaisearch", # Vector Database 
+    "llama-index-experimental",  # PandasQueryEngine support 
+    "azure-identity",            # Managed Identity & Credentials 
+    "azure-storage-blob",        # Blob storage for indexing 
+    "azure-cosmos",              # Persistence layer 
+    "azure-search-documents",    # Azure AI Search client 
+    "azure-ai-projects",         # Bing Grounding & Agentic tools 
+    "pandas",                    # Data analysis 
+    "python-dotenv",             # Environment management 
+    "nest-asyncio",              # Async compatibility 
+    "requests"                   # Graph API interactions 
+]
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["*"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "flake8"
+]

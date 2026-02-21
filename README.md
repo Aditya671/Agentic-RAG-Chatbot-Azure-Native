@@ -89,26 +89,26 @@ Building a production-ready RAG system involves more than just hitting an API. B
 
 # Enterprise Agentic RAG Chatbot (Global Edition)
 
-An advanced, production-grade AI assistant featuring multi-agent orchestration, hybrid vector search, and automated data analysis. [cite_start]This system is designed for high-availability enterprise environments, leveraging a robust Azure-native stack to provide grounded, context-aware insights across structured and unstructured data[cite: 84, 85].
+An advanced, production-grade AI assistant featuring multi-agent orchestration, hybrid vector search, and automated data analysis. This system is designed for high-availability enterprise environments, leveraging a robust Azure-native stack to provide grounded, context-aware insights across structured and unstructured data .
 
 ---
 
 ## 🚀 Core Features
 
 ### 🧠 Hybrid Agentic Orchestration
-* [cite_start]**Multi-Model Support:** Dynamically switches between models like GPT-4o and GPT-5.1 depending on reasoning requirements[cite: 127, 128].
-* [cite_start]**Task-Specific Agents:** Features a `FunctionAgent` architecture that selects the best tool for the job, whether it's document retrieval, internet search, or Python-based data analysis[cite: 115, 116].
-* [cite_start]**Global Context Awareness:** A sophisticated system prompt ensures the AI acts as a Technical Architect & Engineering Lead, maintaining high standards for code and data integrity across global operations[cite: 272, 273, 274].
+* **Multi-Model Support:** Dynamically switches between models like GPT-4o and GPT-5.1 depending on reasoning requirements.
+* **Task-Specific Agents:** Features a `FunctionAgent` architecture that selects the best tool for the job, whether it's document retrieval, internet search, or Python-based data analysis.
+* **Global Context Awareness:** A sophisticated system prompt ensures the AI acts as a Technical Architect & Engineering Lead, maintaining high standards for code and data integrity across global operations.
 
 ### 🔍 Advanced RAG Pipeline
-* [cite_start]**Unstructured Data (PDFs):** Uses **Azure AI Search** with semantic hybrid retrieval to query deep document repositories[cite: 91, 399].
-* [cite_start]**Structured Data (CSV):** An integrated **PandasQueryEngine** allows the agent to reason over complex tabular data using natural language[cite: 102, 103, 104].
-* [cite_start]**Smart Ingestion:** Automated `UserUploadedFileIndexer` that handles local file uploads, computes hashes to prevent redundant indexing, and generates automatic summaries for quick previews[cite: 148, 149, 151, 161].
+* **Unstructured Data (PDFs):** Uses **Azure AI Search** with semantic hybrid retrieval to query deep document repositories ].
+* **Structured Data (CSV):** An integrated **PandasQueryEngine** allows the agent to reason over complex tabular data using natural language.
+* **Smart Ingestion:** Automated `UserUploadedFileIndexer` that handles local file uploads, computes hashes to prevent redundant indexing, and generates automatic summaries for quick previews.
 
 ### 💾 Enterprise-Grade Infrastructure
-* [cite_start]**Persistent Memory:** Chat history, user feedback, and UI elements are persisted in **Azure Cosmos DB**, enabling seamless session resumption[cite: 331, 332, 386].
-* [cite_start]**Secure Vaulting:** All sensitive API keys and connection strings are managed via **Azure Key Vault**[cite: 90, 137].
-* [cite_start]**Real-time UI:** Built with **Chainlit**, featuring streaming responses, interactive settings, and live file upload status[cite: 1, 51, 64].
+* **Persistent Memory:** Chat history, user feedback, and UI elements are persisted in **Azure Cosmos DB**, enabling seamless session resumption.
+* **Secure Vaulting:** All sensitive API keys and connection strings are managed via **Azure Key Vault**.
+* **Real-time UI:** Built with **Chainlit**, featuring streaming responses, interactive settings, and live file upload status.
 
 ---
 
@@ -129,20 +129,20 @@ An advanced, production-grade AI assistant featuring multi-agent orchestration, 
 ## 🏗 Architectural Highlights
 
 ### 🔄 Dynamic Session Management
-The engine partitions conversation history into "past" and "current" segments. [cite_start]It automatically summarizes older context to stay within token limits while preserving critical session data for the LLM[cite: 92, 93, 122, 123].
+The engine partitions conversation history into "past" and "current" segments. It automatically summarizes older context to stay within token limits while preserving critical session data for the LLM.
 
 ### 🧪 Robust Logging & Error Handling
-[cite_start]A custom `setup_logger` provides granular tracking across the application, including specific suppresses for Azure SDK noise and specialized filters for third-party libraries like LlamaIndex[cite: 129, 130, 131].
+A custom `setup_logger` provides granular tracking across the application, including specific suppresses for Azure SDK noise and specialized filters for third-party libraries like LlamaIndex.
 
 ---
 
 ## ⚙️ Configuration & Setup
 
 1. **Environment Variables:**
-   [cite_start]Create a `.env` file based on the provided configuration logic, including your Azure endpoints and Key Vault URLs[cite: 1, 136, 144].
+   Create a `.env` file based on the provided configuration logic, including your Azure endpoints and Key Vault URLs.
 
 2. **Authentication:**
-   [cite_start]The system uses **Azure Active Directory (OAuth)** for user identity and **DefaultAzureCredential** for secure service-to-service communication[cite: 12, 13, 17, 398].
+   The system uses **Azure Active Directory (OAuth)** for user identity and **DefaultAzureCredential** for secure service-to-service communication.
 
 3. **Running the App:**
    ```bash

@@ -20,15 +20,14 @@ from chainlit.user import User
 from azure.storage.blob import BlobServiceClient
 from azure.identity import DefaultAzureCredential
 
-from src.backend.UploadFileWrapper import UploadedFileWrapper
-from src.backend.utility import generate_blob_sas_url
-from src.backend.azure_blob_file_retriever import AzureBlobFileRetriever
-from src.backend.cosmos_db_date_layer import CosmosDBDataLayer
-from src.backend.ai_models import AIModelTypes
-# from src.backend.user_uploaded_file_indexer import UserUploadedFileIndexer
-from src.backend.config import config, Environment
-from src.backend.credential_manager import CredentialManager
-from src.backend.agentic_ai_system import AsyncAgenticAiSystem
+from backend.UploadFileWrapper import UploadedFileWrapper
+from backend.utility import generate_blob_sas_url
+from backend.azure_blob_file_retriever import AzureBlobFileRetriever
+from backend.cosmos_db_date_layer import CosmosDBDataLayer
+from backend.ai_models import AIModelTypes
+from backend.config import config, Environment
+from backend.credentials.azure_credential_manager import AzureCredentialManager
+from backend.agentic_ai_system import AsyncAgenticAiSystem
 from app_logger import setup_logger
 
 
@@ -39,7 +38,7 @@ models_list  = [model.value  for model in model_enum ]
 
 def load_blob_bytes():
     salesforce_index_config = config.indexes.get('salesforce')
-    salesforce_credential_manager = CredentialManager(key_vault_url=salesforce_index_config.key_vault.get("url"))
+    salesforce_credential_manager = AzureCredentialManager(key_vault_url=salesforce_index_config.key_vault.get("url"))
     blob_service = BlobServiceClient.from_connection_string(\
         salesforce_credential_manager.client.get_secret(salesforce_index_config.storage_account.get('connection_string')).value \
     )
@@ -184,7 +183,7 @@ def get_data_layer():
     select_index = 'aiim'
     environment = os.getenv('ENVIRONMENT', 'local')
     
-    credential_manager = CredentialManager(key_vault_url=config.indexes[select_index].key_vault.get("url"))
+    credential_manager = AzureCredentialManager(key_vault_url=config.indexes[select_index].key_vault.get("url"))
     if environment == 'local' or environment == Environment.DEVELOPMENT.value:
         url = credential_manager.client.get_secret(\
                 config.indexes[select_index].dev_cosmos_db['uri']\
@@ -300,7 +299,7 @@ async def on_chat_resume(thread):
             ).send()
 
     cl.user_session.set('settings', settings)
-    credential_manager = CredentialManager(key_vault_url=config.indexes[settings['select_index']].key_vault.get("url"))
+    credential_manager = AzureCredentialManager(key_vault_url=config.indexes[settings['select_index']].key_vault.get("url"))
     
     if 'elements' in thread:
         for element in thread['elements']:
@@ -394,7 +393,7 @@ async def on_message(message: cl.Message):
                     )\
                 ).send()
         cl.user_session.set('settings', settings)
-        credential_manager = CredentialManager(key_vault_url=config.indexes[settings['select_index']].key_vault.get("url"))
+        credential_manager = AzureCredentialManager(key_vault_url=config.indexes[settings['select_index']].key_vault.get("url"))
         user = cl.user_session.get('user')        
         agentic_engine = cl.user_session.get('agentic_engine')
         if cl.user_session.get('agentic_engine') is None:
@@ -534,7 +533,7 @@ async def on_message(message: cl.Message):
 async def stream_answer_and_citations(\
     target_msg_element: cl.Message,\
     response_content: str,\
-    credential_manager: CredentialManager,\
+    credential_manager: AzureCredentialManager,\
     thread_settings: Dict[str, Any]\
 ):
     # Set Content to "" from "Processing the Query..." content, displayed on UI - Code Start

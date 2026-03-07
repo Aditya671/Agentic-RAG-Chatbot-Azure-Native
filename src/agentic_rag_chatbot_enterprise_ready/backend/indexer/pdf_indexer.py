@@ -6,9 +6,9 @@ from datetime import datetime
 from typing import List, Dict, Tuple, Optional
 
 import fitz  # PyMuPDF
-from llama_index import Document, GPTVectorStoreIndex, ServiceContext
-from llama_index.embeddings import AzureOpenAIEmbedding
-from llama_index.vector_stores import AzureAISearchVectorStore
+from llama_index.core import Document, GPTVectorStoreIndex, ServiceContext
+from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
+from llama_index.vector_stores.azureaisearch import AzureAISearchVectorStore
 from app_logger import setup_logger
 
 # Initialize logger

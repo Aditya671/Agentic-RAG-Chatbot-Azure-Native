@@ -2,7 +2,7 @@ import os
 from azure.identity import DefaultAzureCredential, AzureCliCredential
 from azure.keyvault.secrets import SecretClient
 
-class CredentialManager:
+class AzureCredentialManager:
     def __init__(self, key_vault_url: str = None):
         """
         Initializes the credential manager.

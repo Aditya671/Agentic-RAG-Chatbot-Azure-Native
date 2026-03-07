@@ -1,9 +1,9 @@
 from pandasai import SmartDataframe
-from pandasai.llm import AzureOpenAI as PandasAIAzureOpenAI
+from pandasai_openai import AzureOpenAI as PandasAIAzureOpenAI
 
 # ... inside AsyncAgenticCSVChatEngine class ...
 
-def __build_csv_engine(self):
+def __build_csv_engine(self, logger) -> SmartDataframe:
     """
     Replaces the legacy PandasQueryEngine with PandasAI SmartDataframe.
     """

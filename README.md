@@ -1,9 +1,10 @@
-# Agentic-RAG-Chatbot-Azure-Native
+# Agentic-RAG-Chatbot-Enterprise-Ready
 An Enterprise ready multi-agent AI assistant featuring hybrid search, automated CSV data analysis, and persistent conversation memory using Azure Cosmos DB.
 
 ---
 
 ## Key Technical Features:
+
 - Multi-Index Orchestration: Dynamically switches between Vector indexes for unstructured PDFs and a PandasQueryEngine for structured CSV data (like Salesforce meeting records).
 -  Persistent Memory Layer: Custom integration with Azure Cosmos DB for high-availability storage of chat history and user feedback.
 - Smart Ingestion Pipeline: Features a UserUploadedFileIndexer that handles local file uploads, computes hashes to avoid redundant indexing, and generates automatic document summaries.
@@ -12,6 +13,7 @@ An Enterprise ready multi-agent AI assistant featuring hybrid search, automated 
 ---
   
 ## Tech Stack:
+
 - Orchestration: LlamaIndex, Chainlit.
 - LLMs: Azure OpenAI (GPT-4o, GPT-5.1).
 - Database: Azure Cosmos DB, Azure AI Search (Vector Store).
@@ -40,25 +42,28 @@ Short-term: Managed via Azure Cosmos DB (Session-based).
 Long-term: Documents are indexed in Azure AI Search, but the architecture allows for a "Graph" layer to be added for complex relationship mapping between data points.
 -->
 ## Technical Challenges & Design Decisions
+
 Building a production-ready RAG system involves more than just hitting an API. Below are the key engineering hurdles I solved:
   
   1. **Structured vs. Unstructured Data Ambiguity**
      - **The Challenge**: Users often ask questions that require "joining" data across different formats (e.g., "Summarize the project notes in this PDF and compare them to the budget in the CSV"). Standard RAG fails here because vector search is poor at tabular math.
      - **The Solution**: Implemented a Router Orchestrator. I used LlamaIndex to build a `QueryEngine` that detects the intent. If the query requires calculation, it routes to a `PandasQueryEngine`; if it requires semantic meaning, it hits the Azure AI Search vector index.
   
-  4. **State Management & "Memory Leak" in Conversations**
+  2. **State Management & "Memory Leak" in Conversations**
       - **The Challenge**: Storing chat history in-memory (RAM) causes data loss on server restarts and prevents horizontal scaling across multiple containers.
       - **The Solution**: Integrated **Azure Cosmos DB** as a persistent NoSQL backend.
         - **TTL (Time to Live)**: Configured for session cleanup.
         - **Partition Keys**: Used `SessionID` as the partition key to ensure millisecond latency even as the database scales to millions of conversations.
   
-  5. **Preventing "Inference Flooding" (Cost & Rate Limits)**
+  3. **Preventing "Inference Flooding" (Cost & Rate Limits)**
       - **The Challenge**: Agentic loops (like Bing Search) can sometimes "hallucinate" and enter an infinite loop of API calls, draining the Azure OpenAI token quota.
       - **The Solution**: * Implemented **Max-Loop Constraints** on the Agentic Orchestrator.
       - Developed a **UserUploadedFileIndexer** that computes MD5 Hashes of files. If a user re-uploads the same 50MB PDF, the system recognizes the hash and skips the expensive embedding/ingestion process.
+
 ---
 
 ## Tech Stack Justification
+
 | Component     | Choice          | Why not the alternative?                        |
 | ------------- | --------------- | ----------------------------------------------- |
 | Vector Store  | Azure AI Search | Better enterprise security and integrated "Hybrid Search" (Keyword + Vector) compared to standalone Pinecone. |
@@ -68,21 +73,26 @@ Building a production-ready RAG system involves more than just hitting an API. B
 ---
 
 ## Upcoming Features & Roadmap:
+
 ### Model Agnostic Infrastructure
+
   - [ ] **Multi-Model Routing:** Implement a LiteLLM proxy layer to seamlessly switch between Azure OpenAI, Anthropic (Claude 3.5 Sonnet), and local models via Ollama.
   - [ ] **Dynamic Model Fallback:** Automatic failover logic to high-context models (like GPT-4o) when complex reasoning is required, while using smaller models (GPT-4o-mini) for routing/summarization to optimize costs.
 
 ### Extensible Agentic Ecosystem
+
   - [ ] **Plug-and-Play Tool Registry:** Transition to a decorator-based tool system, allowing new Python functions or API wrappers to be registered as Agent tools with zero configuration.
   - [ ] **Code Interpreter Sandbox:** Migration to an E2B or Docker-based execution environment for safer, more robust Python data analysis.
   - [ ] **Advanced RAG (GraphRAG):** Integration of Knowledge Graphs to map entities across Salesforce records and internal PDFs for multi-hop reasoning.
 
 ### Enterprise Scalability & Observability
+
   - [ ] **Distributed Task Queue:** Implementation of Celery/Redis for handling long-running document ingestion and heavy data processing tasks asynchronously.
   - [ ] **Traces & Evaluation:** Integration of Arize Phoenix or LangSmith for deep tracing of agentic thought chains and RAG "Faithfulness" scoring.
   - [ ] **Kubernetes Deployment:** Helm charts for auto-scaling the Chainlit frontend and the ingestion workers based on traffic spikes.
 
 ### Security & Governance
+
   - [ ] **PII Redaction Layer:** Automated masking of sensitive data before it reaches the LLM provider.
   - [ ] **RBAC (Role-Based Access Control):** Granular permissions for document indexes based on user identity via Entra ID (Azure AD).
 
@@ -96,16 +106,19 @@ An advanced, production-grade AI assistant featuring multi-agent orchestration, 
 ## 🚀 Core Features
 
 ### 🧠 Hybrid Agentic Orchestration
+
 * **Multi-Model Support:** Dynamically switches between models like GPT-4o and GPT-5.1 depending on reasoning requirements.
 * **Task-Specific Agents:** Features a `FunctionAgent` architecture that selects the best tool for the job, whether it's document retrieval, internet search, or Python-based data analysis.
 * **Global Context Awareness:** A sophisticated system prompt ensures the AI acts as a Technical Architect & Engineering Lead, maintaining high standards for code and data integrity across global operations.
 
 ### 🔍 Advanced RAG Pipeline
+
 * **Unstructured Data (PDFs):** Uses **Azure AI Search** with semantic hybrid retrieval to query deep document repositories ].
 * **Structured Data (CSV):** An integrated **PandasQueryEngine** allows the agent to reason over complex tabular data using natural language.
 * **Smart Ingestion:** Automated `UserUploadedFileIndexer` that handles local file uploads, computes hashes to prevent redundant indexing, and generates automatic summaries for quick previews.
 
 ### 💾 Enterprise-Grade Infrastructure
+
 * **Persistent Memory:** Chat history, user feedback, and UI elements are persisted in **Azure Cosmos DB**, enabling seamless session resumption.
 * **Secure Vaulting:** All sensitive API keys and connection strings are managed via **Azure Key Vault**.
 * **Real-time UI:** Built with **Chainlit**, featuring streaming responses, interactive settings, and live file upload status.
@@ -129,9 +142,11 @@ An advanced, production-grade AI assistant featuring multi-agent orchestration, 
 ## 🏗 Architectural Highlights
 
 ### 🔄 Dynamic Session Management
+
 The engine partitions conversation history into "past" and "current" segments. It automatically summarizes older context to stay within token limits while preserving critical session data for the LLM.
 
 ### 🧪 Robust Logging & Error Handling
+
 A custom `setup_logger` provides granular tracking across the application, including specific suppresses for Azure SDK noise and specialized filters for third-party libraries like LlamaIndex.
 
 ---
@@ -145,5 +160,5 @@ A custom `setup_logger` provides granular tracking across the application, inclu
    The system uses **Azure Active Directory (OAuth)** for user identity and **DefaultAzureCredential** for secure service-to-service communication.
 
 3. **Running the App:**
-   ```bash
+  ```bash
    chainlit run App.py

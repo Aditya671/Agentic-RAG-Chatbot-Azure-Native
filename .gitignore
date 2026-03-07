@@ -10,4 +10,5 @@ __pychache__
 storage/
 data
 build
-src/agentic_rag_chatbot_azure_native.egg-info/
+*.egg-info/
+src/agentic_rag_chatbot_enterprise_ready.egg-info/

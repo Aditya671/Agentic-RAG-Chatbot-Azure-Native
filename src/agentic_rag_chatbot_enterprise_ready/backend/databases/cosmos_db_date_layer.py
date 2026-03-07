@@ -2,7 +2,7 @@ import datetime
 import asyncio
 import uuid
 from typing import Optional, Dict, List, Any
-from src.backend.credential_manager import CredentialManager
+from backend.azure_credential_manager import AzureCredentialManager
 from azure.cosmos import CosmosClient
 from chainlit import User, PersistedUser
 from chainlit.data.base import BaseDataLayer
@@ -98,7 +98,7 @@ class CosmosDBDataLayer(BaseDataLayer):
 		- Timestamps are added during creation and update for audit purposes.
 	"""
 	def __init__(self,\
-		credential: CredentialManager,\
+		credential: AzureCredentialManager,\
 		url: str,\
 		database_id: str,\
 		container_id: str,\
@@ -395,14 +395,14 @@ class CosmosDBDataLayer(BaseDataLayer):
 		except Exception as e:
 			print(f"Delete failed: {e}")
 			return False
-		try:
-			items = await self.get_steps(step_id)
-			for item in items:
-				await asyncio.to_thread(self.container.delete_item,item['id'], partition_key=item[self.partition_key_field])
-			return True
-		except Exception as e:
-			print(e)
-			return False
+		# try:
+		# 	items = await self.get_steps(step_id)
+		# 	for item in items:
+		# 		await asyncio.to_thread(self.container.delete_item,item['id'], partition_key=item[self.partition_key_field])
+		# 	return True
+		# except Exception as e:
+		# 	print(e)
+		# 	return False
 
 	# # ----------------------
 	# # THREAD METHODS

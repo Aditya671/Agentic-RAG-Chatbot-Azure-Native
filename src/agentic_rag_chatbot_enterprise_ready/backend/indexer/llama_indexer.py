@@ -1,4 +1,4 @@
-# src/agentic_rag_chatbot_azure_native/indexer/llama_indexer.py
+# src/agentic_rag_chatbot_enterprise_ready/indexer/llama_indexer.py
 
 import os
 import io
@@ -11,9 +11,10 @@ from typing import List, Tuple, Dict, Optional, Iterable
 import fitz  # PyMuPDF for PDFs
 import pandas as pd
 from docx import Document as DocxDocument  # python-docx
-from llama_index import Document, GPTVectorStoreIndex, ServiceContext
-from llama_index.embeddings import AzureOpenAIEmbedding
-from llama_index.vector_stores import AzureAISearchVectorStore
+from llama_index.core.schema import Document, ServiceContext
+from llama_index.core import GPTVectorStoreIndex 
+from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
+from llama_index.vector_stores.azureaisearch import AzureAISearchVectorStore
 from app_logger import setup_logger
 
 logger, _ = setup_logger(name="llama-indexer")

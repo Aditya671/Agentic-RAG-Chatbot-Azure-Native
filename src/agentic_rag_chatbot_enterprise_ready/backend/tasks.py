@@ -4,7 +4,7 @@ import os
 from celery import Celery
 from dotenv import load_dotenv
 
-from src.backend.user_uploaded_file_indexer import UserUploadedFileIndexer
+from backend.user_uploaded_file_indexer import UserUploadedFileIndexer
 
 load_dotenv(override=True)
 

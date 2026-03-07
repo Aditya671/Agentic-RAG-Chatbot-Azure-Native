@@ -1,6 +1,6 @@
 import os
 import json
-from src.backend.app_logger import setup_logger
+from app_logger import setup_logger
 from datetime import datetime, timedelta
 from typing import Optional, List, Literal
 import asyncio
@@ -26,12 +26,12 @@ from llama_index.core.vector_stores.types import VectorStoreQueryMode
 from llama_index.llms.azure_openai import AzureOpenAI
 from llama_index.core.schema import Document
 
-from src.backend.llm_loader import load_embed, load_llm
-from src.backend.config import config
-from src.backend.ai_models import AIModelTypes
-from src.backend.credential_manager import CredentialManager
-from src.backend.prompts import AGENTIC_AI_SYSTEM_PROMPT
-from src.backend.utility import compute_file_hash
+from backend.llm_loader import load_embed, load_llm
+from backend.config import config
+from backend.ai_models import AIModelTypes
+from backend.azure_credential_manager import AzureCredentialManager
+from backend.prompts import AGENTIC_AI_SYSTEM_PROMPT
+from backend.utility import compute_file_hash
 
 
 logger, log_filename = setup_logger('user_uploaded_file_indexer')
@@ -60,7 +60,7 @@ class UserUploadedFileIndexer:
         model (AIModelTypes): Enum value indicating the selected model (e.g., GPT4O, GPT35).
         index_config (dict): Index-specific configuration loaded from application-level config.
         embed_model: The embedding model loaded based on configuration and set globally in Settings.
-        credential_manager (CredentialManager): Manager for securely accessing secrets (e.g., Azure credentials).
+        credential_manager (AzureCredentialManager): Manager for securely accessing secrets (e.g., Azure credentials).
 
     Methods:
         index_uploaded_file(uploaded_file, index_name=None) -> str
@@ -120,7 +120,7 @@ class UserUploadedFileIndexer:
         Settings.embed_model = self.embed_model
 
         # Initialize OpenAI LLM (only if needed for downstream querying/synthesis)
-        self.credential_manager = CredentialManager(key_vault_url=self.index_config.key_vault.get("url"))
+        self.credential_manager = AzureCredentialManager(key_vault_url=self.index_config.key_vault.get("url"))
         Settings.llm = self.__init_llm(self.credential_manager)
         logger.info(f"[UserUploadedFileIndexer] LLM and Embed Model Loaded for Model: {self.model}")
 

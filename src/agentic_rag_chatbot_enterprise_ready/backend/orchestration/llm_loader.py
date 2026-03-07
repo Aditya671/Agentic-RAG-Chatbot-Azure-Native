@@ -11,9 +11,9 @@ from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
 
-from src.backend.ai_models import AIModelTypes
-from src.backend.config import config, IndexConfig
-from src.backend.credential_manager import CredentialManager
+from backend.ai_models import AIModelTypes
+from backend.config import config, IndexConfig
+from backend.azure_credential_manager import AzureCredentialManager
 
 
 DEFAULT_TEMPERATURE = 0.1
@@ -53,7 +53,7 @@ def load_llm(
     key_vault_config = index_config.key_vault
     if key_vault_config is None or key_vault_config.get("url") is None:
         raise ValueError(f"Key vault URL configuration is missing for index '{index_name}'.")
-    credential_manager = CredentialManager(key_vault_url=key_vault_config["url"])
+    credential_manager = AzureCredentialManager(key_vault_url=key_vault_config["url"])
     if use_azure:
         credential = DefaultAzureCredential()
         token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
@@ -121,7 +121,7 @@ def load_embed(
     key_vault_config = index_config.key_vault
     if key_vault_config is None or key_vault_config.get("url") is None:
         raise ValueError(f"Key vault URL configuration is missing for index '{index_name}'.")
-    credential_manager = CredentialManager(key_vault_url=key_vault_config["url"])
+    credential_manager = AzureCredentialManager(key_vault_url=key_vault_config["url"])
     if index_config is None:
         raise ValueError(f"Configuration for index '{index_name}' not found.")
     # Determine if using Azure OpenAI or regular OpenAI

@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agentic-rag-chatbot-azure-native"
+name = "agentic-rag-chatbot-enterprise-ready"
 version = "1.0.0"
-description = "POC - A global enterprise Agentic RAG system featuring multi-agent orchestration and Azure-native persistence."
+description = "POC - A global enterprise Agentic RAG system featuring multi-agent orchestration and cloud persistence."
 authors = [
     { name = "Aditya Gupta", email = "aditya.gupta671@gmail.com" }
 ]
@@ -26,25 +26,36 @@ classifiers = [
 
 dependencies = [
     "chainlit",
-    "pandasai",
     "llama-index",
     "llama-index-llms-openai",
     "llama-index-llms-azure-openai",
     "llama-index-embeddings-azure-openai",
     "llama-index-vector-stores-azureaisearch",
     "azure-identity",
+    "azure-keyvault-secrets",
     "azure-storage-blob",
     "azure-cosmos",
     "azure-search-documents",
     "azure-ai-projects",
+    "azure-ai-inference",
+    "botocore",
+    "boto3",
+    "openai",
+    "langchain",
     "pandas",
+    "pandasai",
+    "pandasai_openai",
     "python-dotenv",
     "nest-asyncio",
     "requests",
     "markdown",
     "pymongo",
     "pyMupdf",
-    "xhtml2pdf"
+    "xhtml2pdf",
+    "celery",
+    "motor",
+    "docx",
+    "e2b"
 ]
 
 [project.optional-dependencies]
@@ -57,11 +68,11 @@ dev = [
 ]
 
 [project.scripts]
-agentic-rag = "agentic_rag_chatbot_azure_native.main:cli"
+agentic-rag = "agentic_rag_chatbot_enterprise_ready.main:cli"
 
 [tool.setuptools]
 include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["agentic_rag_chatbot_azure_native*"]
+include = ["agentic_rag_chatbot_enterprise_ready*"]

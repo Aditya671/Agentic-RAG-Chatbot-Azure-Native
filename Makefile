@@ -2,13 +2,13 @@
 PYTHON = python3
 PIP = pip
 # Path to entry point assuming it is moved into src/frontend
-APP_PATH = src/frontend/App.py
+APP_PATH = src/agentic_rag_chatbot_enterprise_ready/frontend/app.py
 
 .PHONY: version
 
 version:
 	@echo "Current Project Version:"
-	@python3 -c "from src.version import __version__; print(__version__)"
+	@python3 -c "from version import __version__; print(__version__)"
 
 # Helper to quickly bump version (Example: make bump V=1.0.1)
 bump:

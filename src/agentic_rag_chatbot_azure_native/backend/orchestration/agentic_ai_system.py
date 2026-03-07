@@ -4,7 +4,6 @@ from app_logger import setup_logger
 import pandas as pd
 import asyncio
 import nest_asyncio
-from typing import Optional, AsyncGenerator, List, Any, Dict
 from datetime import datetime, timedelta, timezone
 import ast
 import re
@@ -12,6 +11,7 @@ from io import BytesIO
 import json
 import tempfile
 from dotenv import load_dotenv
+from typing import Optional, AsyncGenerator, List, Any, Dict
 
 from chainlit import LlamaIndexCallbackHandler
 
@@ -31,7 +31,7 @@ from llama_index.core.memory import Memory
 from llama_index.core.llms import (
 	ChatMessage, TextBlock, MessageRole,
 )
-from llama_index.core import Settings
+from llama_index.core import Settings, Document
 from llama_index.core.vector_stores.types import VectorStoreQueryMode
 
 from src.backend.azure_blob_file_retriever import AzureBlobFileRetriever
@@ -46,6 +46,10 @@ from src.backend.config import config
 from src.backend.credential_manager import CredentialManager
 from src.backend.llm_loader import load_llm, load_embed
 from src.backend.indexer.azure_search_initializer import initialize_index
+from src.backend.orchestration.code_interpreter import CodeInterpreterSandbox
+from src.backend.orchestration.reranker import initialize_reranker
+from src.backend.orchestration.graph_rag import GraphRAGSystem
+from src.backend.tasks import index_files_task
 from src.backend.prompts import (
 	AGENTIC_PANDAS_QUERY_ENGINE_RESPONSE_SYNTHESIS_PROMPT,
 	AGENTIC_AI_SYSTEM_PROMPT,
@@ -54,6 +58,7 @@ from src.backend.prompts import (
 	AGENTIC_AI_CODEX_PROMPT
 )
 
+from celery.result import AsyncResult
 logger, log_filename = setup_logger('agentic_chat_engine')
 
 
@@ -68,11 +73,13 @@ class AsyncAgenticAiSystem:
 		llm_creativity_level: float = 0.1, \
 		similarity_top_k: int = 20,\
 		reasoning_effect = 'low',
+		enable_reranker: bool = True,
+		enable_graph_rag: bool = False,
 		index_name: Optional[str] = None,\
 		session_id: str = str(uuid.uuid4()),\
 		upload_root_dir: str = tempfile.mkdtemp(prefix="llama_index_"),\
-		conversation_thread: List = [], \
-		blob_bytes : Dict[str, Any] = {"bytes":bytes('', encoding="utf-8"), "metadata": '{}'},
+		conversation_thread: List = [],
+		blob_bytes: Dict[str, Any] = {"bytes":bytes('', encoding="utf-8"), "metadata": '{}'},
 		enable_coding_assistant=False
 	):
 		"""
@@ -95,6 +102,8 @@ class AsyncAgenticAiSystem:
 		self.similarity_top_k = similarity_top_k
 		effort = "high" if (reasoning_effect == "high" and self.selected_model in DEFAULT_REASONING_EFFORT) else DEFAULT_REASONING_EFFORT.get(self.selected_model, reasoning_effect)
 		self.reasoning_effect = { "reasoning_effort":  effort}
+		self.enable_reranker = enable_reranker
+		self.enable_graph_rag = enable_graph_rag
 		# if self.selected_model in DEFAULT_REASONING_EFFORT:
 		# 	self.reasoning_effect = { "reasoning_effort": "high"} if reasoning_effect == "high" else  { "reasoning_effort": DEFAULT_REASONING_EFFORT[self.selected_model]}
 		self.index_name = index_name or os.getenv("INDEX_NAME", "aiim")
@@ -151,6 +160,9 @@ class AsyncAgenticAiSystem:
 
 		self.blob_bytes = blob_bytes
 		self.enable_coding_assistant = enable_coding_assistant
+		self.reranker = self.__build_reranker()
+		self.graph_rag_system = self.__build_graph_rag_system()
+		self.code_interpreter = self.__build_code_interpreter()
 		## AgenticAi - Build Tools & Agent
 		self.csv_engine = self.__build_csv_engine()
 		self.retriever_tool = self.__build_retriever_tool
@@ -164,6 +176,11 @@ class AsyncAgenticAiSystem:
 
 		## Actual Ai Assistant
 		self.agent = self.__build_agent()
+
+	def close(self):
+		"""Closes any open resources, like the code interpreter sandbox."""
+		if self.code_interpreter:
+			self.code_interpreter.close()
 
 	# ----------------------- Setters ------------------------------- #
 	def _get_reasoning_config(self, reasoning_effect: str) -> dict:
@@ -342,6 +359,20 @@ class AsyncAgenticAiSystem:
 		self.agent = self.__build_agent()
 		return
 
+	def set_reranker(self, enable_reranker=False):
+		logger.info(f"""[AgenticAi] Set Reranker: {enable_reranker} """)
+		self.enable_reranker = enable_reranker
+		self.reranker = self.__build_reranker()
+		self.agent = self.__build_agent()
+		return
+
+	def set_graph_rag(self, enable_graph_rag=False):
+		logger.info(f"""[AgenticAi] Set Graph RAG: {enable_graph_rag} """)
+		self.enable_graph_rag = enable_graph_rag
+		self.graph_rag_system = self.__build_graph_rag_system()
+		self.agent = self.__build_agent()
+		return
+
 	def set_coding_assistant(self, enable_coding_assistant=False):
 		self.enable_coding_assistant=enable_coding_assistant
 		self.agent = self.__build_agent()
@@ -451,38 +482,55 @@ class AsyncAgenticAiSystem:
 			)
 	# ----------------------- Setters ------------------------------- #
 
-	# LLM Output Processore for user friendly output
-	# Code-Block to return preformatted code block which can be copied.
-	def __safe_output_processor(self, output: str) -> Any:
-		"""
-		Determines if the model's output is valid Python code or just plain text.
-		Executes and returns result if it's code; otherwise returns the text.
-		"""
-		output = output.strip()
-
-		# Remove any markdown-style code blocks like ```python
-		if output.startswith("```"):
-			output = re.sub(r"^```(?:python)?", "", output).strip()
-			output = re.sub(r"```$", "", output).strip()
-
-		if self.__is_valid_python_code(output):
-			try:
-				local_vars = {}
-				exec(output, {}, local_vars)
-				return local_vars
-			except Exception as e:
-				return f"⚠️ Failed to execute code: {str(e)}"
-		else:
-			# It's just a plain text/natural language answer
-			return output
-
-	# Python Code Validator
-	def __is_valid_python_code(self, code: str) -> bool:
+	# ----------------------- Builders ------------------------------ #
+	def __build_reranker(self):
+		if not self.enable_reranker:
+			return None
 		try:
-			ast.parse(code)
-			return True
-		except SyntaxError:
-			return False
+			# Using a smaller, faster model for reranking to optimize cost and latency.
+			rerank_llm = load_llm(
+				model=AIModelTypes.GPT41_MINI,
+				index_name=self.index_name,
+				use_azure=True,
+				callback_manager=self.callback_manager
+			)
+			logger.info("[AgenticAi] Initializing Neural Reranker.")
+			# Ensure top_n for reranker is not more than similarity_top_k
+			reranker_top_n = min(5, self.similarity_top_k)
+			return initialize_reranker(llm=rerank_llm, top_n=reranker_top_n)
+		except Exception as e:
+			logger.error(f"[AgenticAi] Failed to initialize reranker: {e}. Reranking will be disabled.")
+			return None
+
+	def __build_graph_rag_system(self):
+		if not self.enable_graph_rag:
+			return None
+		try:
+			logger.info("[AgenticAi] Initializing GraphRAG System.")
+			graph_system = GraphRAGSystem(llm=self.llm, embed_model=self.embed)
+			# In a real application, you would load documents from a persistent source.
+			# For this example, we'll use a placeholder document to build the graph.
+			# This demonstrates how entities and relationships are extracted.
+			placeholder_docs = [
+				Document(text="Aditya Gupta works as a Senior Software Engineer at Microsoft. Microsoft is a major technology company. Emily is a product manager at Microsoft and works with Aditya on the Azure project.")
+			]
+			graph_system.build_graph_from_documents(placeholder_docs)
+			return graph_system
+		except Exception as e:
+			logger.error(f"[AgenticAi] Failed to initialize GraphRAG system: {e}. GraphRAG will be disabled.")
+			return None
+
+	def __build_code_interpreter(self):
+		if not self.enable_coding_assistant:
+			return None
+		try:
+			logger.info("[AgenticAi] Initializing Code Interpreter Sandbox.")
+			return CodeInterpreterSandbox()
+		except Exception as e:
+			logger.error(f"[AgenticAi] Failed to initialize Code Interpreter: {e}. Coding assistant will be limited.")
+			return None
+
+
 
 	def __dummy_function(self, *args, **kwargs):
 		# Log or return a message that indicates the tool was bypassed.
@@ -656,20 +704,56 @@ class AsyncAgenticAiSystem:
 			logger.error(f"[AgenticAi] User File Query Error: {e}")
 			return f"Error querying local file index: {e}"
 
-	async def upload_and_index_files(self, uploaded_files: List) -> dict[Any, Any]:
+	def upload_and_index_files_async(self, uploaded_files: List) -> str:
 		"""
-		Accepts files to upload and indexes them using UserUploadedFileIndexer[index_uploaded_files].
-		Returns:
-			Dictionary[FileName: Summary of File]
-		Raises:
-			Exception: If agent creation fails.
+		Triggers an asynchronous background task to index uploaded files.
+		Returns a task ID for status tracking.
 		"""
 		try:
-			result = await self.local_file_indexer.index_uploaded_files(file_list=uploaded_files)
-			return result
+			# The file objects from chainlit are not serializable for Celery.
+			# We write the files to the shared `upload_root_dir` first, then pass
+			# file metadata to the Celery task.
+			file_paths_for_task = []
+			for file_data in uploaded_files:
+				path = os.path.join(self.upload_root_dir, file_data['name'])
+				with open(path, "wb") as f:
+					f.write(file_data['content'])
+				file_paths_for_task.append({'name': file_data['name'], 'path': path})
+
+			task = index_files_task.delay(
+				file_list=file_paths_for_task,
+				root_dir=self.upload_root_dir,
+				index_name=self.index_name,
+				model=self.selected_model.value,
+				similarity_top_k=self.similarity_top_k
+			)
+			logger.info(f"[AgenticAi] File indexing task started with ID: {task.id}")
+			return f"File indexing has been started in the background. Your Task ID is: {task.id}. Use the 'check_indexing_status' tool to check its progress."
 		except Exception as e:
-			logger.error(f"[AgenticAi] ")
-			return f"Failed to index uploaded files: {e}"
+			logger.error(f"[AgenticAi] Failed to start file indexing task: {e}")
+			return f"Failed to start file indexing task: {e}"
+
+	def check_indexing_status(self, task_id: str) -> str:
+		"""
+		Checks the status of a background indexing task.
+		Args:
+			task_id (str): The ID of the task to check.
+		Returns:
+			str: The status or result of the task.
+		"""
+		try:
+			task_result = AsyncResult(task_id)
+			if task_result.ready():
+				if task_result.successful():
+					result = task_result.get()
+					return f"Task {task_id} completed successfully. Result: {result}"
+				else:
+					return f"Task {task_id} failed. Error: {task_result.info}"
+			else:
+				return f"Task {task_id} is still in progress. Status: {task_result.state}"
+		except Exception as e:
+			logger.error(f"Error checking task status for {task_id}: {e}")
+			return f"Could not retrieve status for task {task_id}."
 
 	def bing_grounding_tool(self, query) -> Any:
 		"""
@@ -717,19 +801,33 @@ class AsyncAgenticAiSystem:
 			Exception: If agent creation fails.
 		"""
 		try:
+			retriever_kwargs = {
+				"vector_store_query_mode": VectorStoreQueryMode.SEMANTIC_HYBRID,
+				"similarity_top_k": self.similarity_top_k,
+			}
+			if self.reranker:
+				retriever_kwargs["node_postprocessors"] = [self.reranker]
+				logger.info("[AgenticAi] Reranker attached to the retriever pipeline.")
+
 			im_retriever_tool = self.__build_retriever_tool(
-				retriever=self.index.as_retriever(
-					vector_store_query_mode=VectorStoreQueryMode.SEMANTIC_HYBRID,
-					similarity_top_k=self.similarity_top_k,
-				),
+				retriever=self.index.as_retriever(**retriever_kwargs),
 				name='im_retriever_tool',
-				description="Tool for querying unstructured data from documents, specifically PDF chunks.",
+				description="Tool for querying unstructured data from documents, specifically PDF chunks. Use this for semantic search over text content.",
 			)
 
+			agent_tools = [im_retriever_tool]
+
+			# Standard tools
+
 			upload_and_index_user_file_tool = self.__build_function_tool(
-				fn=self.upload_and_index_files,
+				fn=self.upload_and_index_files_async,
 				name='upload_and_index_user_file_tool',
-				description="Upload files and create an index for querying so that their content can be queried later."
+				description="Uploads files and starts a background task to index them. Returns a task ID."
+			)
+			check_indexing_status_tool = self.__build_function_tool(
+				fn=self.check_indexing_status,
+				name='check_indexing_status_tool',
+				description="Checks the status of a background file indexing task using its task ID."
 			)
 			query_user_upload_file_indexes_tool = self.__build_function_tool(
 				fn=self.query_local_file_index,
@@ -741,6 +839,28 @@ class AsyncAgenticAiSystem:
 				name='internet_search_tool',
 				description="Tool to perform Bing web search (Internet Search) via Azure AI agent."
 			)
+			agent_tools.extend([upload_and_index_user_file_tool, check_indexing_status_tool, query_user_upload_file_indexes_tool, internet_search_tool])
+
+			# Conditional tools
+			if self.graph_rag_system and self.graph_rag_system.index:
+				graph_rag_tool = self.__build_function_tool(
+					fn=self.graph_rag_system.query,
+					name='graph_rag_tool',
+					description="Tool for querying a knowledge graph about entities and their relationships. Use this for questions like 'Who works at Microsoft?' or 'What is the connection between Aditya and Emily?'."
+				)
+				agent_tools.append(graph_rag_tool)
+				logger.info("[AgenticAi] GraphRAG tool added to the agent.")
+
+			# Add Code Interpreter tool if enabled
+			if self.enable_coding_assistant and self.code_interpreter:
+				code_interpreter_tool = self.__build_function_tool(
+					fn=self.code_interpreter.run_python,
+					name='code_interpreter_tool',
+					description="Executes Python code in a secure sandbox environment. Use this for any calculations, data manipulation, or when you need to run code."
+				)
+				agent_tools.append(code_interpreter_tool)
+				logger.info("[AgenticAi] Code Interpreter tool added to the agent.")
+
 			agent_system_prompt = AGENTIC_AI_SYSTEM_PROMPT.format(\
 					now_str=datetime.now().strftime("%Y-%m-%d"),
 				)
@@ -749,7 +869,7 @@ class AsyncAgenticAiSystem:
 					now_str=datetime.now().strftime("%Y-%m-%d"),
 				)
 			agent = FunctionAgent(
-				tools=[im_retriever_tool, upload_and_index_user_file_tool, query_user_upload_file_indexes_tool, internet_search_tool ],
+				tools=agent_tools,
 				llm=self.llm,
 				system_prompt=agent_system_prompt,
 				verbose=True

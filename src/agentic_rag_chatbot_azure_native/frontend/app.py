@@ -60,7 +60,9 @@ def app_default_setting(
     select_response_mode = 'low',
     set_model_top_k = 20,
     set_creativity_level = 0.1,
-    enable_coding_assistant=False
+    enable_coding_assistant=False,
+    enable_reranker=True,
+    enable_graph_rag=False
 ):
     user = cl.user_session.get('user')
     indexes = []
@@ -107,7 +109,19 @@ def app_default_setting(
             initial=enable_coding_assistant,
             tooltip="Enable or disable the coding assistant",
             description="Toggles the coding assistant's availability for help"
-        )
+        ),
+        Switch(
+            id="Enable Reranker",
+            label="Enable Neural Reranker",
+            value=enable_reranker, # Default value
+            description="Re-ranks search results for better relevance using an LLM.",
+        ),
+        Switch(
+            id="Enable GraphRAG",
+            label="Enable Graph RAG",
+            value=enable_graph_rag, # Default value
+            description="Enables querying relationships between entities (e.g., 'Who works with whom?').",
+        ),
     ]
     return all_tools
 
@@ -155,7 +169,9 @@ async def on_settings_change(settings):
             select_response_mode=settings['select_response_mode'],\
             set_creativity_level=settings['set_creativity_level'],\
             set_model_top_k=settings['set_model_top_k'], \
-            enable_coding_assistant=settings['enable_coding_assistant']
+            enable_coding_assistant=settings['enable_coding_assistant'], \
+            enable_reranker=settings['enable_reranker'], \
+            enable_graph_rag=settings['enable_graph_rag'], 
         )\
     ).send()
     return cl.user_session.set('settings', settings)
@@ -232,8 +248,10 @@ async def start():
                 upload_root_dir=temp_upload_dir,\
                 # upload_root_dir=f'user_uploads\\{user.identifier}',\
                 conversation_thread = [], \
-                blob_bytes = blob_bytes,
-                enable_coding_assistant=settings['enable_coding_assistant']
+                blob_bytes = blob_bytes,\
+                enable_coding_assistant=settings['enable_coding_assistant'], \
+                enable_reranker=settings['enable_reranker'], \
+                enable_graph_rag=settings['enable_graph_rag'], \
             )
         logger.info(f"[AgenticAiSystem] LoggedIn user {user.identifier or 'local_user'}, \n"
             f"Initiating new Thread: {cl.user_session.get('id')} \n"
@@ -260,7 +278,9 @@ async def on_chat_resume(thread):
                 select_response_mode=user_settings['select_response_mode'],\
                 set_creativity_level=user_settings['set_creativity_level'],\
                 set_model_top_k=user_settings['set_model_top_k'], \
-            enable_coding_assistant=settings['enable_coding_assistant']
+                enable_coding_assistant=user_settings['enable_coding_assistant'],
+                enable_reranker=user_settings['enable_reranker'], \
+                enable_graph_rag=user_settings['enable_graph_rag']
             )
             ).send()        
     elif app_chat_settings is None:
@@ -273,7 +293,9 @@ async def on_chat_resume(thread):
                 select_response_mode=app_chat_settings['select_response_mode'],\
                 set_creativity_level=app_chat_settings['set_creativity_level'],\
                 set_model_top_k=app_chat_settings['set_model_top_k'], \
-                enable_coding_assistant=app_chat_settings['enable_coding_assistant']
+                enable_coding_assistant=app_chat_settings['enable_coding_assistant'],
+                enable_reranker=app_chat_settings['enable_reranker'], \
+                enable_graph_rag=app_chat_settings['enable_graph_rag'], \
             )
             ).send()
 
@@ -304,8 +326,11 @@ async def on_chat_resume(thread):
                 session_id=cl.user_session.get('id'),\
                 upload_root_dir=tempfile.mkdtemp(prefix="llama_index_") ,
                 conversation_thread=cl.user_session.get('chat_history'), \
-                blob_bytes = blob_bytes,
-                enable_coding_assistant=settings['enable_coding_assistant']
+                blob_bytes = blob_bytes, \
+                enable_coding_assistant=settings['enable_coding_assistant'], \
+                enable_reranker=settings['enable_reranker'], \
+                enable_graph_rag=settings['enable_graph_rag'], \
+    
             )
         cl.user_session.set('agentic_engine', agent)
     else:
@@ -317,7 +342,8 @@ async def on_chat_resume(thread):
         agentic_engine.set_similarity_top_k(similarity_top_k=app_chat_settings['set_model_top_k'])
         agentic_engine.set_index_name(index_name=app_chat_settings['select_index'])
         agentic_engine.set_coding_assistant(enable_coding_assistant=app_chat_settings['enable_coding_assistant'])
-
+        agentic_engine.set_reranker(enable_reranker=app_chat_settings['enable_reranker'])
+        agentic_engine.set_graph_rag(enable_graph_rag=app_chat_settings['enable_graph_rag'])
                 
 
 @cl.on_feedback
@@ -382,8 +408,10 @@ async def on_message(message: cl.Message):
                 upload_root_dir=tempfile.mkdtemp(prefix="llama_index_"),\
                 # upload_root_dir=f'user_uploads\\{user.identifier}',\
                 conversation_thread=chat_history, \
-                blob_bytes = blob_bytes,
-                enable_coding_assistant=settings['enable_coding_assistant']
+                blob_bytes = blob_bytes, \
+                enable_coding_assistant=settings['enable_coding_assistant'], \
+                enable_reranker=settings.get("enable_reranker"), \
+                enable_graph_rag=settings.get("enable_graph_rag"), \
             )
             cl.user_session.set('agentic_engine', agentic_engine)
         else:
@@ -394,6 +422,9 @@ async def on_message(message: cl.Message):
             agentic_engine.set_similarity_top_k(similarity_top_k=settings['set_model_top_k'])
             agentic_engine.set_index_name(index_name=settings['select_index'])
             agentic_engine.set_coding_assistant(enable_coding_assistant=settings['enable_coding_assistant'])
+            agentic_engine.set_reranker(enable_reranker=settings['enable_reranker'])
+            agentic_engine.set_graph_rag(enable_graph_rag=settings['enable_graph_rag'])
+
         final_answer = cl.Message(content='')
         # await final_answer.stream_token('Processing the Query...')
         async def animate_status():

@@ -1,3 +1,4 @@
+from hashlib import sha256
 
 def compute_file_hash(file_path):
     hasher = sha256()

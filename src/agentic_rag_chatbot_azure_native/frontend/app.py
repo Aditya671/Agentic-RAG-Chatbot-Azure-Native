@@ -100,19 +100,15 @@ def app_default_setting(
             Higher settings (closer to 1) allow more varied and creative answers, but may be less accurate.
             """
         ),
+        Switch(
+            type="switch",
+            id="enable_coding_assistant",
+            label="Enable Coding Assistant",
+            initial=enable_coding_assistant,
+            tooltip="Enable or disable the coding assistant",
+            description="Toggles the coding assistant's availability for help"
+        )
     ]
-    if "Data Science" in user_groups:
-        coding_tool = [
-            Switch(
-                type="switch",
-                id="enable_coding_assistant",
-                label="Enable Coding Assistant",
-                initial=enable_coding_assistant,
-                tooltip="Enable or disable the coding assistant",
-                description="Toggles the coding assistant's availability for help"
-            )
-        ]
-        all_tools.extend(coding_tool)
     return all_tools
 
 @cl.oauth_callback

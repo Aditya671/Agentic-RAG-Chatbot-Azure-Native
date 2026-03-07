@@ -1,38 +1,67 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "agentic-rag-chatbot-azure-native"
 version = "1.0.0"
-description = "A global enterprise Agentic RAG system featuring multi-agent orchestration and Azure-native persistence."
+description = "POC - A global enterprise Agentic RAG system featuring multi-agent orchestration and Azure-native persistence."
 authors = [
     { name = "Aditya Gupta", email = "aditya.gupta671@gmail.com" }
 ]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11,<3.13"
 license = {file = "LICENSE"}
-dependencies = [
-    "chainlit>=1.1.0",           # Main UI Framework 
-    "pandasai>=2.0.0"            # Added for modern conversational data analysis
-    "llama-index-core",          # RAG Orchestration 
-    "llama-index-llms-azure-openai", # Azure LLM Integration 
-    "llama-index-embeddings-azure-openai", # Azure Embeddings 
-    "llama-index-vector-stores-azureaisearch", # Vector Database 
-    "llama-index-experimental",  # PandasQueryEngine support 
-    "azure-identity",            # Managed Identity & Credentials 
-    "azure-storage-blob",        # Blob storage for indexing 
-    "azure-cosmos",              # Persistence layer 
-    "azure-search-documents",    # Azure AI Search client 
-    "azure-ai-projects",         # Bing Grounding & Agentic tools 
-    "pandas",                    # Data analysis 
-    "python-dotenv",             # Environment management 
-    "nest-asyncio",              # Async compatibility 
-    "requests"                   # Graph API interactions 
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence"
 ]
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["*"]
+
+dependencies = [
+    "chainlit",
+    "pandasai",
+    "llama-index",
+    "llama-index-llms-openai",
+    "llama-index-llms-azure-openai",
+    "llama-index-embeddings-azure-openai",
+    "llama-index-vector-stores-azureaisearch",
+    "azure-identity",
+    "azure-storage-blob",
+    "azure-cosmos",
+    "azure-search-documents",
+    "azure-ai-projects",
+    "pandas",
+    "python-dotenv",
+    "nest-asyncio",
+    "requests",
+    "markdown",
+    "pymongo",
+    "pyMupdf",
+    "xhtml2pdf"
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
     "black",
-    "flake8"
+    "flake8",
+    "twine",
+    "build"
 ]
+
+[project.scripts]
+agentic-rag = "agentic_rag_chatbot_azure_native.main:cli"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["agentic_rag_chatbot_azure_native*"]

@@ -9,3 +9,5 @@ venv
 __pychache__
 storage/
 data
+build
+src/agentic_rag_chatbot_azure_native.egg-info/

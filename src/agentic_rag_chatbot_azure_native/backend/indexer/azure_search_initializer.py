@@ -1,91 +1,29 @@
-import asyncio
-import os
 from datetime import datetime
-from enum import Enum
-from pathlib import Path
-from typing import Dict, List, Optional, Union, Any
-from urllib.parse import quote_plus
+from typing import Union
 import logging
-
-# Third-party imports
-import pandas as pd
 import nest_asyncio
+
 from azure.identity import DefaultAzureCredential
 from azure.search.documents.aio import SearchClient
 from azure.search.documents.indexes import SearchIndexClient
-from sqlalchemy import (
-    Column,
-    Integer,
-    MetaData,
-    String,
-    Table,
-    create_engine,
-    select,
-    text,
-)
-
 # LlamaIndex core imports
-from llama_index.core import (
-    Settings,
-    SimpleDirectoryReader,
-    SimpleKeywordTableIndex,
-    SQLDatabase,
-    StorageContext,
-    SummaryIndex,
-    VectorStoreIndex,
-    load_index_from_storage,
-)
-from llama_index.core.chat_engine import CondenseQuestionChatEngine, CondensePlusContextChatEngine
-from llama_index.core.indices.query.query_transform import (
-    HyDEQueryTransform,
-    StepDecomposeQueryTransform,
-)
-from llama_index.core.llms import ChatMessage, MessageRole
-from llama_index.core.memory import ChatMemoryBuffer
-from llama_index.core.prompts.prompt_type import PromptType
-from llama_index.core.query_engine import (
-    CitationQueryEngine,
-    MultiStepQueryEngine,
-    NLSQLTableQueryEngine,
-    RouterQueryEngine,
-)
-from llama_index.core.response_synthesizers import (
-    ResponseMode,
-    TreeSummarize,
-    get_response_synthesizer,
-)
-from llama_index.core.vector_stores.types import VectorStoreQueryMode
-from llama_index.core.query_pipeline import QueryPipeline as QP
-from llama_index.core.base.base_retriever import BaseRetriever
-from llama_index.core.schema import NodeWithScore, QueryBundle, TextNode
-
+from llama_index.core import ( Settings, StorageContext, VectorStoreIndex )
+# from llama_index.core.query_pipeline import QueryPipeline as QP #Deprecated since llamaIndex version 0.14.3
 # LlamaIndex provider-specific imports
 from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
 from llama_index.embeddings.openai import OpenAIEmbedding
-from llama_index.llms.azure_openai import AzureOpenAI
-from llama_index.llms.openai import OpenAI
-from llama_index.vector_stores.azureaisearch import (
-    AzureAISearchVectorStore,
-)
-from aiim.aiim_types import AIIMResponseMode, AIIMModel
-from aiim.llm_loader import load_llm, load_embed
-from aiim.config import config
-from aiim.streamlit_server.prompts import CITATION_QA_TEMPLATE_CONCISE, CITATION_QA_TEMPLATE_DETAILED, PQE_instruction_str, PQE_pandas_prompt_str, PQE_response_synthesis_prompt_str
-from aiim.bing_search.bing_service_client import perform_internet_search
+from llama_index.vector_stores.azureaisearch import AzureAISearchVectorStore
+
 
 credential = DefaultAzureCredential()
+
 # Apply nest_asyncio to allow nested loops
 nest_asyncio.apply()
-
-# config_path = Path(__file__).resolve().parent.parent / "config.yml"
-# config = yaml.safe_load(open(config_path, "r"))
 CURRENT_DATE = datetime.now().strftime("%Y-%m-%d")
 DEFAULT_TOP_K = 25
 DEFAULT_TEMPERATURE = 0.1
 
-# Create a logger for this module
 logger = logging.getLogger(__name__)
-
 
 
 def initialize_index(
@@ -174,8 +112,6 @@ def initialize_index(
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
     Settings.llm = llm
     Settings.embed_model = embed_model
-    index = VectorStoreIndex.from_documents(
+    return VectorStoreIndex.from_documents(
         [], storage_context=storage_context, llm=llm, embed_model=embed_model
     )
-
-    return index

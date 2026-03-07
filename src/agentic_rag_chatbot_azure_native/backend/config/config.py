@@ -7,7 +7,7 @@ from enum import Enum
 
 # Constants in UPPER_CASE
 DEFAULT_ENVIRONMENT: str = "local"
-VALID_ENVIRONMENTS = {"local", "development", "uat", "staging", "production"}
+VALID_ENVIRONMENTS = {"local", "local_emulator", "development", "uat", "staging", "production"}
 
 # Enum class in PascalCase
 class Environment(str, Enum):
@@ -17,6 +17,17 @@ class Environment(str, Enum):
     UAT = "uat"
     STAGING = "staging"
     PRODUCTION = "production"
+
+class CloudProvider(str, Enum):
+    AZURE = "azure"
+    AWS = "aws"
+    GCP = "gcp"
+
+class DatabaseProvider(str, Enum):
+    COSMOS_DB = "cosmos_db"
+    DYNAMO_DB = "dynamo_db"
+    POSTGRESQL = "postgresql"
+    MONGODB = "mongodb"
 
 class IndexConfig:
     """
@@ -34,6 +45,11 @@ class IndexConfig:
     @property
     def storage_account(self) -> Dict[str, Any]:
         return self.settings.get("storage_account", {})
+    
+    @property
+    def s3_bucket(self) -> Dict[str, Any]:
+        """Get the S3 bucket configuration for AWS."""
+        return self.settings.get("s3_bucket", {})
 
     @property
     def embed(self) -> Dict[str, Any]:
@@ -47,6 +63,11 @@ class IndexConfig:
     def key_vault(self) -> Dict[str, Any]:
         return self.settings.get("key_vault", {})
     
+    @property
+    def secrets_manager(self) -> Dict[str, Any]:
+        """Get the AWS Secrets Manager configuration."""
+        return self.settings.get("secrets_manager", {})
+
     @property
     def di(self) -> Dict[str, Any]:
         """Get the Document Intelligence configuration."""
@@ -72,6 +93,21 @@ class IndexConfig:
         """Get the Cosmos DB Prod configuration."""
         return self.settings.get("prod_cosmos_db", {})
     
+    @property
+    def dynamo_db(self) -> Dict[str, Any]:
+        """Get the DynamoDB configuration."""
+        return self.settings.get("dynamo_db", {})
+
+    @property
+    def postgresql(self) -> Dict[str, Any]:
+        """Get the PostgreSQL configuration."""
+        return self.settings.get("postgresql", {})
+
+    @property
+    def mongodb(self) -> Dict[str, Any]:
+        """Get the MongoDB configuration."""
+        return self.settings.get("mongodb", {})
+
     @property
     def ai_service(self) -> Dict[str, Any]:
         """Get the Cosmos DB Prod configuration."""
@@ -161,6 +197,18 @@ class Config:
         return {name: IndexConfig(name, settings) for name, settings in indexes_config.items()}
 
     @property
+    def cloud_provider(self) -> CloudProvider:
+        """Get the configured cloud provider."""
+        provider = self._get_config().get("cloud", {}).get("provider", "azure").lower()
+        return CloudProvider(provider)
+
+    @property
+    def database_provider(self) -> DatabaseProvider:
+        """Get the configured database provider."""
+        provider = self._get_config().get("database", {}).get("provider", "cosmos_db").lower()
+        return DatabaseProvider(provider)
+
+    @property
     def llms(self) -> Dict[str, Any]:
         """
         Returns the LLM configurations from the config file.
@@ -201,15 +249,34 @@ class Config:
         return self._get_config().get("azure", {}).get("key_vault", {}).get("openai_api_key_name")
 
     @property
-    def key_vault_config(self) -> Dict[str, Any]:
-        """Get the complete Key Vault configuration."""
-        return self._get_config().get("azure", {}).get("key_vault", {})
+    def secrets_management(self) -> Dict[str, Any]:
+        """Get the secrets management configuration (Key Vault, AWS Secrets Mgr, etc)."""
+        if self.cloud_provider == CloudProvider.AZURE:
+            return self._get_config().get("azure", {}).get("key_vault", {})
+        elif self.cloud_provider == CloudProvider.AWS:
+            return self._get_config().get("aws", {}).get("secrets_manager", {})
+        return self._get_config().get("secrets", {})
 
     @property
     def cosmos_db_uri(self) -> Optional[str]:
         """Get the Cosmos Db Key from key Vault."""
         return self._get_config().get("azure", {}).get("key_vault", {}).get("uri")
     
+    @property
+    def dynamo_db_table(self) -> Optional[str]:
+        """Get the DynamoDB table name."""
+        return self._get_config().get("aws", {}).get("dynamo_db", {}).get("table_name")
+
+    @property
+    def postgresql_config(self) -> Dict[str, Any]:
+        """Get the PostgreSQL configuration."""
+        return self._get_config().get("database", {}).get("postgresql", {})
+
+    @property
+    def mongodb_config(self) -> Dict[str, Any]:
+        """Get the MongoDB configuration."""
+        return self._get_config().get("database", {}).get("mongodb", {})
+
     @property
     def ai_service(self) -> Dict[str, Any]:
         """

@@ -36,7 +36,7 @@ from llama_index.core.vector_stores.types import VectorStoreQueryMode
 
 from src.backend.azure_blob_file_retriever import AzureBlobFileRetriever
 from src.backend.user_uploaded_file_indexer import UserUploadedFileIndexer
-from src.backend.utility import parse_response_sources
+from src.backend.utility import parse_response_sources, to_millions
 from src.backend.ai_models import (
 	AIModelTypes,
 	MODEL_TOKEN_LIMITS,
@@ -45,7 +45,7 @@ from src.backend.ai_models import (
 from src.backend.config import config
 from src.backend.credential_manager import CredentialManager
 from src.backend.llm_loader import load_llm, load_embed
-from src.backend.index_engine import initialize_index
+from src.backend.indexer.azure_search_initializer import initialize_index
 from src.backend.prompts import (
 	AGENTIC_PANDAS_QUERY_ENGINE_RESPONSE_SYNTHESIS_PROMPT,
 	AGENTIC_AI_SYSTEM_PROMPT,
@@ -166,6 +166,13 @@ class AsyncAgenticAiSystem:
 		self.agent = self.__build_agent()
 
 	# ----------------------- Setters ------------------------------- #
+	def _get_reasoning_config(self, reasoning_effect: str) -> dict:
+		if self.selected_model in DEFAULT_REASONING_EFFORT:
+			effort = "high" if reasoning_effect == "high" else DEFAULT_REASONING_EFFORT[self.selected_model]
+		else:
+			effort = reasoning_effect
+		return {"reasoning_effort": effort}
+
 	def set_memory(self, conversation_thread):
 		if isinstance(conversation_thread, list) and len(conversation_thread) > 0:
 			conversation_thread.sort(key=lambda s: s.get("createdAt") or "", reverse=True)
@@ -192,7 +199,6 @@ class AsyncAgenticAiSystem:
 					)
 				)
 
-
 	def set_conversation_thread(self, thread):
 		now = datetime.now().replace(tzinfo=timezone.utc)
 		start_of_today = datetime(now.year, now.month, now.day).replace(tzinfo=timezone.utc)
@@ -201,24 +207,24 @@ class AsyncAgenticAiSystem:
 		# Partition thread into past and current
 		past_thread = [
 			m for m in thread
-			if datetime.fromisoformat(m["createdAt"]).replace(tzinfo=timezone.utc) <= start_of_yesterday
+			if "createdAt" in m and datetime.fromisoformat(m["createdAt"]).replace(tzinfo=timezone.utc) <= start_of_yesterday
 		]
 		current_thread = [
 			m for m in thread
-			if datetime.fromisoformat(m["createdAt"]).replace(tzinfo=timezone.utc) > start_of_yesterday
+			if "createdAt" in m and datetime.fromisoformat(m["createdAt"]).replace(tzinfo=timezone.utc) > start_of_yesterday
 		]
 
 		# Improved branching logic
 		if past_thread and current_thread:
 			# Summarize past, keep current
 			self.conversation_thread = [
-				{'role': 'system', 'content': self.__summarize_conversation(past_thread)},
+				{'role': 'system', 'content': self.__summarize_thread(past_thread)},
 				*current_thread
 			]
 		elif not past_thread and len(current_thread) > 8:
 			# Summarize first 9 messages if only current exists and it's long
 			len(current_thread)
-			summary = self.__summarize_conversation(int((abs(len(current_thread) * 0.6))))
+			summary = self.__summarize_thread(int((abs(len(current_thread) * 0.6))))
 			self.conversation_thread = [
 				{'role': 'system', 'content': summary},
 				*current_thread[int((abs(len(current_thread) * 0.6))):]
@@ -340,6 +346,93 @@ class AsyncAgenticAiSystem:
 		self.enable_coding_assistant=enable_coding_assistant
 		self.agent = self.__build_agent()
 		return
+
+	@staticmethod
+	async def guardrail_check(user_input: str) -> bool:
+		"""Simple check for PII or prohibited topics."""
+		prohibited = ["password", "secret_key", "internal_url"]
+		if any(word in user_input.lower() for word in prohibited):
+			return "⚠️ Security Alert: Prohibited content detected."
+		return True
+
+	@staticmethod
+	async def self_correction_loop(llm, response, context):
+		"""Asks the LLM to verify if its own response is grounded in the context."""
+		verification_prompt = f"Does this answer: '{response}' align with context: '{context}'? Reply YES or NO."
+		verdict = await llm.acomplete(verification_prompt)
+		return "YES" in verdict.text.upper()
+
+
+	def generate_thread_title(self) -> str:
+		"""
+		Generate a thread title based on the first question and its answer.
+
+		Args:
+			self (cls)
+
+		Returns:
+			str: A short, descriptive title.
+		"""
+		first_question = ''
+		first_answer = ''
+		for message in self.memory.get_all():
+			if message.role == MessageRole.USER and first_question == '':
+				first_question = message.content or ''
+			elif message.role == MessageRole.ASSISTANT and first_answer == '':
+				first_answer = message.content or ''
+		conversation_text = f"User: {first_question}\nAssistant: {first_answer}"
+		# title = Settings.llm
+		title = load_llm(model=AIModelTypes.GPT41_MINI,\
+				index_name=self.index_name,\
+				use_azure=True,\
+				callback_manager = self.callback_manager
+			).complete(\
+				f'Give me a Title based on the conversation (Maximum 8 words): {conversation_text}'\
+			)
+		return title.text
+
+	def __summarize_thread(self, messages: list = [], start_idx: int = 0, end_idx: int = None) -> str:
+		"""
+		Summarize a set of conversation messages to reduce token length.
+
+		Args:
+			self (cls)
+			start_idx (int): Start index of messages to summarize.
+			end_idx (int): End index of messages to summarize. If None, summarize to the end.
+
+		Returns:
+			str: A concise summary of the selected conversation messages.
+		"""
+		if end_idx is None:
+			end_idx = len(messages)
+		conversation_snippets = []
+		for msg in messages[start_idx:end_idx]:
+			role = "User" if msg['role'] == MessageRole.USER else "Assistant"
+			conversation_snippets.append(f"{role}: {msg['content']}")
+		conversation_text = "\n".join(conversation_snippets)
+		summary_prompt = (
+			f"Summarize the following conversation, "
+			f"preserving key context and decisions:\n{conversation_text}"
+		)
+		summary = load_llm(
+			model=AIModelTypes.GPT41_MINI,
+			index_name=self.index_name,
+			use_azure=True,
+			callback_manager = self.callback_manager
+		).complete(summary_prompt)
+		return summary.text
+
+	def get_token_counts(self):
+		return {
+			"Model": self.selected_model,
+			"ModelLimit": MODEL_TOKEN_LIMITS[self.selected_model],
+			"PromptTokens": self.token_counter.prompt_llm_token_count,
+			"PromptTokensExhausted": (self.token_counter.prompt_llm_token_count/MODEL_TOKEN_LIMITS[self.selected_model]) * 100,
+			"CompletionTokens": self.token_counter.completion_llm_token_count,
+			"CompletionTokensExhausted": (self.token_counter.completion_llm_token_count/MODEL_TOKEN_LIMITS[self.selected_model]) * 100,
+			"TotalTokens": self.token_counter.total_llm_token_count,
+			"TotalTokensExhausted": (self.token_counter.total_llm_token_count/MODEL_TOKEN_LIMITS[self.selected_model]) * 100			
+		}
 
 	def reinitialize_index(self):
 		logger.info(f"""[AgenticAi] initialized with search_index: `{self.config.azure_ai_search.get("index_name")}` of IndexName: {self.index_name} """)
@@ -774,73 +867,6 @@ class AsyncAgenticAiSystem:
 		response_metadata = self.get_retriever_metadata(response_block)
 		response_text = await self.collect_async_generator_result(response_stream)
 		return {'response_text': response_text, 'response_metadata': response_metadata}
-
-	def generate_thread_title(self) -> str:
-		"""
-		Generate a thread title based on the first question and its answer.
-
-		Args:
-			self (cls)
-
-		Returns:
-			str: A short, descriptive title.
-		"""
-		first_question = ''
-		first_answer = ''
-		for message in self.memory.get_all():
-			if message.role == MessageRole.USER and first_question == '':
-				first_question = message.content or ''
-			elif message.role == MessageRole.ASSISTANT and first_answer == '':
-				first_answer = message.content or ''
-		conversation_text = f"User: {first_question}\nAssistant: {first_answer}"
-		# title = Settings.llm
-		title = load_llm(model=AIModelTypes.GPT41_MINI,\
-				index_name=self.index_name,\
-				use_azure=True,\
-				callback_manager = self.callback_manager
-			).complete(\
-				f'Give me a Title based on the conversation (Maximum 8 words): {conversation_text}'\
-			)
-		return title.text
-
-	def __summarize_conversation(self, messages: list = [], start_idx: int = 0, end_idx: int = None) -> str:
-		"""
-		Summarize a set of conversation messages to reduce token length.
-
-		Args:
-			self (cls)
-			start_idx (int): Start index of messages to summarize.
-			end_idx (int): End index of messages to summarize. If None, summarize to the end.
-
-		Returns:
-			str: A concise summary of the selected conversation messages.
-		"""
-		if end_idx is None:
-			end_idx = len(messages)
-		conversation_snippets = []
-		for msg in messages[start_idx:end_idx]:
-			role = "User" if msg['role'] == MessageRole.USER else "Assistant"
-			conversation_snippets.append(f"{role}: {msg['content']}")
-		conversation_text = "\n".join(conversation_snippets)
-		summary_prompt = (
-			f"Summarize the following conversation, "
-			f"preserving key context and decisions:\n{conversation_text}"
-		)
-		summary = load_llm(
-			model=AIModelTypes.GPT41_MINI,
-			index_name=self.index_name,
-			use_azure=True,
-			callback_manager = self.callback_manager
-		).complete(summary_prompt)
-		return summary.text
-
-	def get_token_counts(self):
-		return {
-			"Prompt tokens": f"{self.token_counter.prompt_llm_token_count/MODEL_TOKEN_LIMITS[self.selected_model]:.2f}M",
-			"Completion tokens":f" {self.token_counter.completion_llm_token_count/MODEL_TOKEN_LIMITS[self.selected_model]:.2f}M",
-			"Total tokens": f"{self.token_counter.total_llm_token_count/MODEL_TOKEN_LIMITS[self.selected_model]:.2f}M",
-		}
-
 
 # # Example usage
 # if __name__ == "__main__":

@@ -1,6 +1,6 @@
 import datetime
 import uuid
-from typing import Optional, Dict, List, Any
+from typing import Literal, Optional, Dict, List, Any
 from motor.motor_asyncio import AsyncIOMotorClient
 from chainlit import User, PersistedUser
 from chainlit.data.base import BaseDataLayer
@@ -32,9 +32,8 @@ class MongoDBDataLayer(BaseDataLayer):
         self.user_identity = 'local_user'
         self.user_id = str(uuid.uuid4())
 
-        self.message_step_types = [
-            'step', 'user_message', 'assistant_message', "run",
-            "tool", "llm", "embedding", "retrieval", "rerank", "undefined"
+        self.message_step_types = Literal[
+            'user_message', 'assistant_message', "system_message"
         ]
         self.element_types = [
             "image", "text", "pdf", "tasklist", "audio", "video",

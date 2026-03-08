@@ -34,23 +34,23 @@ from llama_index.core.llms import (
 from llama_index.core import Settings, Document
 from llama_index.core.vector_stores.types import VectorStoreQueryMode
 
-from src.backend.azure_blob_file_retriever import AzureBlobFileRetriever
-from src.backend.user_uploaded_file_indexer import UserUploadedFileIndexer
-from src.backend.utility import parse_response_sources, to_millions
-from src.backend.ai_models import (
+from backend.azure_blob_file_retriever import AzureBlobFileRetriever
+from backend.user_uploaded_file_indexer import UserUploadedFileIndexer
+from backend.utils import parse_response_sources, to_millions
+from backend.ai_models import (
 	AIModelTypes,
 	MODEL_TOKEN_LIMITS,
 	DEFAULT_REASONING_EFFORT
 )
-from src.backend.config import config
-from src.backend.credential_manager import CredentialManager
-from src.backend.llm_loader import load_llm, load_embed
-from src.backend.indexer.azure_search_initializer import initialize_index
-from src.backend.orchestration.code_interpreter import CodeInterpreterSandbox
-from src.backend.orchestration.reranker import initialize_reranker
-from src.backend.orchestration.graph_rag import GraphRAGSystem
-from src.backend.tasks import index_files_task
-from src.backend.prompts import (
+from backend.config import config
+from backend.azure_credential_manager import AzureCredentialManager
+from backend.llm_loader import load_llm, load_embed
+from backend.indexer.azure_search_initializer import initialize_index
+from backend.orchestration.code_interpreter import CodeInterpreterSandbox
+from backend.orchestration.reranker import initialize_reranker
+from backend.orchestration.graph_rag import GraphRAGSystem
+from backend.tasks import index_files_task
+from backend.prompts import (
 	AGENTIC_PANDAS_QUERY_ENGINE_RESPONSE_SYNTHESIS_PROMPT,
 	AGENTIC_AI_SYSTEM_PROMPT,
 	AGENTIC_PANDAS_QUERY_ENGINE_INSTRUCTION_PROMPT,
@@ -119,7 +119,7 @@ class AsyncAgenticAiSystem:
 		self.session_id = session_id
 		self.upload_root_dir = upload_root_dir
 		self.memory = Memory.from_defaults(session_id=self.session_id, token_limit=MODEL_TOKEN_LIMITS[self.selected_model])
-		self.credential_manager = CredentialManager(key_vault_url=self.config.key_vault.get("url"))
+		self.credential_manager = AzureCredentialManager(key_vault_url=self.config.key_vault.get("url"))
 
 		self.conversation_thread = self.set_conversation_thread(conversation_thread)
 		# if self.conversation_thread != []:

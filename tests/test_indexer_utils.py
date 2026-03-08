@@ -2,15 +2,15 @@ import os
 import json
 import pytest
 from unittest.mock import patch, MagicMock
-from src.backend.user_uploaded_file_indexer import UserUploadedFileIndexer
+from backend.user_uploaded_file_indexer import UserUploadedFileIndexer
 
 @pytest.fixture
 def mock_indexer(tmp_path):
     # Use a temporary directory for index data to keep tests clean
     root_dir = tmp_path / "uploads"
     root_dir.mkdir()
-    with patch('src.backend.user_uploaded_file_indexer.load_embed'), \
-         patch('src.backend.user_uploaded_file_indexer.load_llm'):
+    with patch('backend.user_uploaded_file_indexer.load_embed'), \
+         patch('backend.user_uploaded_file_indexer.load_llm'):
         indexer = UserUploadedFileIndexer(root_dir=str(root_dir), index_name="test_index")
         return indexer, root_dir
 
@@ -25,7 +25,7 @@ def test_should_reindex_new_file(mock_indexer):
 
 def test_file_hash_consistency(tmp_path):
     """Verifies the utility correctly computes SHA256 hashes for file integrity."""
-    from src.backend.utility import compute_file_hash
+    from backend.utility import compute_file_hash
     test_file = tmp_path / "data.txt"
     test_file.write_bytes(b"enterprise_data")
 

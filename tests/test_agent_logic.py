@@ -1,13 +1,13 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from src.backend.agentic_ai_system import AsyncAgenticAiSystem
+from backend.agentic_ai_system import AsyncAgenticAiSystem
 
 @pytest.fixture
 def mock_engine():
     # Mocking external Azure/OpenAI dependencies to test local logic]
-    with patch('src.backend.AgenticAI.load_llm'), \
-         patch('src.backend.AgenticAI.load_embed'), \
-         patch('src.backend.AgenticAI.initialize_index'):
+    with patch('backend.AgenticAI.load_llm'), \
+         patch('backend.AgenticAI.load_embed'), \
+         patch('backend.AgenticAI.initialize_index'):
         engine = AsyncAgenticAiSystem(index_name="global_index")
         return engine
 
